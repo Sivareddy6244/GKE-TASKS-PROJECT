@@ -1,0 +1,33 @@
+stages:
+  - custom_docker_build
+  - gke_cluster_tf
+  - blue_green_deployments
+
+build_docker_image:
+  stage: custom_docker_build
+  image: docker:latest  
+  services:
+    - docker:19.03.12-dind 
+  script:
+    - docker login registry.gitlab.com -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD  # Authenticate
+    - ls -a
+    - docker build -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/my-image .
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/my-image
+  when: manual
+
+spin_up_gke_cluster_tf:
+  image: registry.gitlab.com/siva3130145/gke-exercises-project/my-image:latest
+  before_script:
+    - apt-get update && apt-get install -y
+    - gcloud auth activate-service-account --key-file $TF_VAR_credential_file
+  stage: gke_cluster_tf
+  script:
+    - ls -a
+    - cd gke-terraform-modules/dev
+    - ls -a
+    - terraform init -backend-config="credentials=$TF_VAR_credential_file"
+    - terraform plan
+    - terraform apply -auto-approve
+
+
+
